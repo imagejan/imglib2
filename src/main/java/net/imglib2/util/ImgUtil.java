@@ -34,13 +34,24 @@
 
 package net.imglib2.util;
 
+import java.util.ArrayList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
+
 import net.imglib2.Cursor;
+import net.imglib2.IterableInterval;
 import net.imglib2.RandomAccess;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.Img;
 import net.imglib2.type.BooleanType;
 import net.imglib2.type.Type;
 import net.imglib2.type.numeric.IntegerType;
 import net.imglib2.type.numeric.RealType;
+import net.imglib2.view.Views;
 
 /**
  * This class contains static methods for copying image data to and from Img
@@ -341,6 +352,72 @@ public class ImgUtil
 				r.setPosition( c );
 				r.get().set( c.get() );
 			}
+		}
+	}
+	
+	/**
+	 * Copy a {@link RandomAccessibleInterval} into an {@link IterableInterval}, multi-threaded.
+	 * 
+	 * @param src
+	 * @param dest
+	 */
+	public static < T extends Type< T > > void copy( final RandomAccessibleInterval< T > src, final IterableInterval< T > dest, final int n_threads )
+	{
+		final IterableInterval< T > img = Views.iterable( src );
+		final ExecutorService exe = Executors.newFixedThreadPool( Math.max( 1, n_threads ) );
+		try {
+			final long num_elements = Intervals.numElements( dest );
+			final ArrayList< Future< Boolean > > futures = new ArrayList< Future< Boolean > >();
+			final AtomicLong jump = new AtomicLong(0);
+			for (int i = 0; i < n_threads; ++i )
+			{
+				futures.add( exe.submit( new Callable< Boolean >()
+				{
+					@Override
+					public Boolean call()
+					{
+						long length = num_elements / n_threads;
+						final long offset = jump.getAndAdd( length );
+						if ( num_elements - offset - length < length)
+							length = num_elements - offset; // last one may be longer
+
+						final Cursor< T > c2 = dest.cursor();
+						c2.jumpFwd( offset );
+
+						if ( img.iterationOrder().equals( dest.iterationOrder() ) )
+						{
+							final Cursor< T > c1 = img.cursor();
+							c1.jumpFwd( offset );
+							long count = -1;
+							while ( ++count < length )
+								c2.next().set( c1.next() );
+						}
+						else
+						{
+							final RandomAccess< T > r = src.randomAccess();
+							long count = -1;
+							while ( ++count < length )
+							{
+								c2.fwd();
+								r.setPosition( c2 );
+								c2.get().set( r.get() );
+							}
+						}
+
+						return true;
+					}
+				} ) );
+			}
+			try {
+				for ( final Future< Boolean > f : futures )
+					f.get();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+			}
+		} finally {
+			exe.shutdownNow();
 		}
 	}
 }

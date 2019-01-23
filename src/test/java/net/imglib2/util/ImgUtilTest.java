@@ -41,9 +41,12 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.Arrays;
 
+import net.imglib2.Cursor;
 import net.imglib2.RandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.img.cell.CellImg;
+import net.imglib2.img.cell.CellImgFactory;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.integer.LongType;
 import net.imglib2.type.numeric.real.DoubleType;
@@ -364,6 +367,46 @@ public class ImgUtilTest
 		{
 			ImgUtil.copy( img, output, offsets[ i ], strides[ i ] );
 			assertArrayEquals( expected[ i ], output );
+		}
+	}
+	
+	@Test
+	public void testCopyRandomAccessibleIntervalToIterableIntervalMultiThreaded()
+	{
+		final Img< LongType > img1 = new ArrayImgFactory<>( new LongType() ).create( 6, 6, 6 );
+		long value = 0;
+		for ( final LongType t : img1 )
+			t.set( ++value ); // starts at 1
+		
+		final Img< LongType > img2 = new ArrayImgFactory<>( new LongType() ).create( 6, 6, 6 );
+		final CellImg< LongType, ? > cell1 = new CellImgFactory<>(new LongType(), 2, 2, 2 ).create( 6, 6, 6 );
+		final CellImg< LongType, ? > cell2 = new CellImgFactory<>(new LongType(), 3, 3, 3 ).create( 6, 6, 6 );
+
+		ImgUtil.copy( img1, img2, 5 );
+		final Cursor< LongType > c1 = img1.cursor();
+		final Cursor< LongType > c2 = img2.cursor();
+		while ( c1.hasNext() )
+			assertEquals( c1.next().get(), c2.next().get() );
+			
+		ImgUtil.copy( img1, cell1, 5);
+		c1.reset();
+		final RandomAccess< LongType > r1 = cell1.randomAccess();
+		while ( c1.hasNext() )
+		{
+			final long v = c1.next().get();
+			r1.setPosition( c1 );
+			assertEquals( v, r1.get().get() );
+		}
+		
+		ImgUtil.copy( cell1, cell2, 5);
+		c1.reset();
+		final RandomAccess< LongType > r2 = cell2.randomAccess();
+		while ( c1.hasNext() )
+		{
+			c1.fwd();
+			r1.setPosition( c1 );
+			r2.setPosition( c1 );
+			assertEquals( r1.get().get(), r2.get().get() );
 		}
 	}
 
