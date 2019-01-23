@@ -322,8 +322,9 @@ public class ImgUtil
 	 */
 	public static < T extends Type< T >> void copy( final Img< T > src, final Img< T > dest )
 	{
-		if ( src.iterationOrder() == dest.iterationOrder() )
+		if ( src.iterationOrder().equals( dest.iterationOrder() ) )
 		{
+			// Equal iteration order implies equal number of elements as well
 			final Cursor< T > c1 = src.cursor(),
 							  c2 = dest.cursor();
 			while ( c1.hasNext() )
