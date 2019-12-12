@@ -47,6 +47,7 @@ import org.junit.Test;
  * @author Stephan Preibisch
  * @author Stephan Saalfeld
  * @author Curtis Rueden
+ * @author Philipp Hanslovsky
  */
 public class ArrayImgTest
 {
@@ -59,5 +60,10 @@ public class ArrayImgTest
 			assertTrue( "ArrayImg failed for: dim=" + Util.printCoordinates( dim[ i ] ),
 					ImgTestHelper.testImg( dim[ i ], new ArrayImgFactory<>( new FloatType() ), new ArrayImgFactory<>( new FloatType() ) ) );
 		}
+	}
+
+	@Test
+	public void testArrayImgInvalidDimensions() {
+		ImgTestHelper.assertInvalidDims( new ArrayImgFactory<>( new FloatType() ) );
 	}
 }
